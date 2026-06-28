@@ -2,7 +2,7 @@
 
 client_id = "f0a72a979bef4b87678eb17a96847bcd"
 name = "BALLAST"
-application_url = "https://stocksentry.onrender.com"
+application_url = "https://stocksentry-v16f.onrender.com"
 embedded = true
 
 [access_scopes]
@@ -13,9 +13,9 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://stocksentry.onrender.com/auth/callback",
-  "https://stocksentry.onrender.com/auth/shopify/callback",
-  "https://stocksentry.onrender.com/api/auth/callback"
+  "https://stocksentry-v16f.onrender.com/auth/callback",
+  "https://stocksentry-v16f.onrender.com/auth/shopify/callback",
+  "https://stocksentry-v16f.onrender.com/api/auth/callback"
 ]
 
 [webhooks]

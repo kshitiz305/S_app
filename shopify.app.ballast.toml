@@ -2,7 +2,7 @@
 
 client_id = "f0a72a979bef4b87678eb17a96847bcd"
 name = "BALLAST"
-application_url = "https://example.com"
+application_url = "https://stocksentry.onrender.com"
 embedded = true
 
 [access_scopes]
@@ -13,9 +13,9 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://example.com/auth/callback",
-  "https://example.com/auth/shopify/callback",
-  "https://example.com/api/auth/callback"
+  "https://stocksentry.onrender.com/auth/callback",
+  "https://stocksentry.onrender.com/auth/shopify/callback",
+  "https://stocksentry.onrender.com/api/auth/callback"
 ]
 
 [webhooks]
@@ -59,4 +59,7 @@ api_version = "2026-04"
 embedded = false
 
 [build]
-automatically_update_urls_on_dev = true
+# Keep the production URL fixed; do not let `shopify app dev` overwrite it.
+# To develop locally again, temporarily set this back to true (or use a separate
+# dev config) so the dev tunnel URL is used.
+automatically_update_urls_on_dev = false

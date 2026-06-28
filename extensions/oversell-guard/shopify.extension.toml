@@ -1,0 +1,17 @@
+api_version = "2026-04"
+
+[[extensions]]
+name = "t:name"
+handle = "oversell-guard"
+type = "function"
+uid = "4838c092-88c3-18e3-7344-ef108359ae0730fc2032"
+description = "t:description"
+
+  [[extensions.targeting]]
+  target = "cart.validations.generate.run"
+  input_query = "src/cart_validations_generate_run.graphql"
+  export = "cart-validations-generate-run"
+
+  [extensions.build]
+  command = ""
+  path = "dist/function.wasm"

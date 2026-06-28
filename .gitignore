@@ -1,0 +1,20 @@
+node_modules
+/build
+/public/build
+.env
+.cache
+.DS_Store
+
+# Prisma local dev db
+*.sqlite
+*.sqlite-journal
+/prisma/dev.sqlite
+
+# Shopify
+.shopify
+/extensions/*/dist
+/extensions/*/generated
+
+# Editor
+.vscode/*
+!.vscode/extensions.json

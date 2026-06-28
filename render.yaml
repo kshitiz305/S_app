@@ -1,0 +1,39 @@
+# Render Blueprint (FREE tier) for StockSentry.
+#
+# Deploy:
+#   1. Push this repo to GitHub.
+#   2. render.com → New → Blueprint → select this repo (it reads this file).
+#   3. Set the three `sync: false` env vars in the dashboard (encrypted):
+#        SHOPIFY_API_SECRET  (Partner Dashboard → BALLAST → API access)
+#        DATABASE_URL        (your Supabase connection string)
+#        SHOPIFY_APP_URL     (https://<your-app>.onrender.com — after first deploy)
+#   4. Deploy. Then set application_url + redirect_urls in shopify.app.ballast.toml
+#      to the onrender.com URL and run `npm run deploy`.
+#
+# Free tier note: the service sleeps after ~15 min idle (slow first load). That is
+# fine for this app — the oversell guard runs on Shopify's servers (reading the
+# metafield), so checkout protection works even while the backend sleeps. Webhook
+# retries + the reconciliation job heal any availability lag.
+
+services:
+  - type: web
+    name: stocksentry
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      # --- non-secret (committed) ---
+      - key: SHOPIFY_API_KEY
+        value: f0a72a979bef4b87678eb17a96847bcd
+      - key: SCOPES
+        value: read_products,write_products,read_inventory,write_inventory,read_orders,read_merchant_managed_fulfillment_orders,read_locations
+      # --- set these in the Render dashboard (encrypted) ---
+      - key: SHOPIFY_APP_URL
+        sync: false
+      - key: SHOPIFY_API_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false

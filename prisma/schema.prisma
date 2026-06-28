@@ -1,0 +1,154 @@
+// StockSentry — Prisma schema
+// DEVELOPMENT_SPEC §7 Phase 1. Production target: Postgres (§6).
+// Decimal is used throughout so fractional units (oz/ml/g) are first-class.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Shopify managed session storage (default migration) ---
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+
+  @@index([shop])
+}
+
+// --- Per-shop settings + billing state ---
+model Shop {
+  id                String    @id @default(cuid())
+  shopId            String    @unique // myshopify.com domain
+  plan              String    @default("free") // free | starter | growth | pro
+  enforceValidation Boolean   @default(true)
+  blockMessage      String    @default("Only {available} left in stock — please reduce the quantity.")
+  defaultBuffer     Decimal   @default(0) @db.Decimal(18, 4)
+  onboardedAt       DateTime?
+  lastReconciledAt  DateTime?
+  installedAt       DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// --- Inventory pool: one physical stock shared by many variants ---
+model Pool {
+  id                String   @id @default(cuid())
+  shopId            String
+  name              String
+  unit              String   @default("each") // each | oz | ml | g | ...
+  totalOnHand       Decimal  @default(0) @db.Decimal(18, 4)
+  buffer            Decimal  @default(0) @db.Decimal(18, 4)
+  lowStockThreshold Decimal? @db.Decimal(18, 4)
+  costPerUnit       Decimal? @db.Decimal(18, 4) // COGS per pool unit (Phase 5)
+  // The product that physically holds the $app:inventory/pool metafield read at checkout.
+  anchorProductId   String?
+  anchorMetafieldId String?
+  // respectManual: a merchant edit in Shopify is treated as a totalOnHand adjustment.
+  // authoritative: the app always wins. (DEVELOPMENT_SPEC §7 Phase 3.5)
+  reconcileMode     String   @default("respectManual")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  members       PoolMember[]
+  ledger        LedgerEntry[]
+  bomComponents BomComponent[]
+
+  @@unique([shopId, name])
+  @@index([shopId])
+}
+
+// --- A variant that draws from a pool ---
+model PoolMember {
+  id              String   @id @default(cuid())
+  poolId          String
+  pool            Pool     @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  variantId       String // gid://shopify/ProductVariant/...
+  productId       String?
+  inventoryItemId String? // for inventoryAdjustQuantities
+  sku             String?
+  title           String?
+  consumesPerUnit Decimal  @default(1) @db.Decimal(18, 4) // e.g. 1, or 0.5
+  createdAt       DateTime @default(now())
+
+  @@unique([poolId, variantId])
+  @@index([variantId])
+}
+
+// --- Bill of materials: a finished variant made of N components ---
+model Bom {
+  id                String         @id @default(cuid())
+  shopId            String
+  name              String
+  finishedVariantId String // gid://shopify/ProductVariant/...
+  finishedProductId String?
+  salePrice         Decimal?       @db.Decimal(18, 4)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  components        BomComponent[]
+
+  @@unique([shopId, finishedVariantId])
+  @@index([shopId])
+}
+
+// --- A component of a BOM: references EITHER a pool OR a tracked variant ---
+model BomComponent {
+  id             String   @id @default(cuid())
+  bomId          String
+  bom            Bom      @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  poolId         String?
+  pool           Pool?    @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  variantId      String? // a directly tracked variant component
+  qtyPerFinished Decimal  @default(1) @db.Decimal(18, 4)
+  costPerUnit    Decimal? @db.Decimal(18, 4) // COGS for a variant-type component
+  createdAt      DateTime @default(now())
+
+  @@index([bomId])
+  @@index([poolId])
+}
+
+// --- Append-only ledger: idempotency key + audit log + reconciliation source ---
+model LedgerEntry {
+  id        String   @id @default(cuid())
+  shopId    String
+  poolId    String
+  pool      Pool     @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  delta     Decimal  @db.Decimal(18, 4) // negative = consume, positive = restock
+  reason    String // order | refund | cancel | manual | reconcile | fulfillment | init
+  sourceId  String? // orderId / refundId / etc.
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([poolId, reason, sourceId])
+  @@index([shopId])
+  @@index([poolId])
+}
+
+// --- Webhook dedupe (idempotency). shopifyEventId is the unique key. ---
+model WebhookEvent {
+  id             String   @id @default(cuid())
+  shopId         String
+  topic          String
+  shopifyEventId String   @unique
+  status         String   @default("processed") // processed | failed | deadletter
+  attempts       Int      @default(1)
+  error          String?
+  processedAt    DateTime @default(now())
+
+  @@index([shopId, topic])
+}

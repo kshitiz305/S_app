@@ -1,0 +1,4 @@
+{
+  "name": "StockSentry oversell guard",
+  "description": "Blocks checkout when cart demand exceeds true shared-pool availability."
+}

@@ -1,0 +1,62 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "f0a72a979bef4b87678eb17a96847bcd"
+name = "BALLAST"
+application_url = "https://example.com"
+embedded = true
+
+[access_scopes]
+# StockSentry scopes (DEVELOPMENT_SPEC §7 Phase 0.2 + read_locations for inventory writes)
+scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,read_merchant_managed_fulfillment_orders,read_locations"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://example.com/auth/callback",
+  "https://example.com/auth/shopify/callback",
+  "https://example.com/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2026-04"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # The order/refund/fulfillment webhooks below carry PROTECTED CUSTOMER DATA.
+  # Shopify blocks subscribing to them until this app has "Protected customer
+  # data access" approved in the Partner Dashboard
+  #   (Apps → BALLAST → API access → Protected customer data access).
+  # fulfillments/create ALSO needs the read_fulfillments scope.
+  # After enabling access, uncomment these four blocks (and add read_fulfillments
+  # to access_scopes) and run `npm run deploy` again.
+  #
+  #   [[webhooks.subscriptions]]
+  #   topics = [ "orders/create" ]
+  #   uri = "/webhooks/orders/create"
+  #
+  #   [[webhooks.subscriptions]]
+  #   topics = [ "refunds/create" ]
+  #   uri = "/webhooks/refunds/create"
+  #
+  #   [[webhooks.subscriptions]]
+  #   topics = [ "orders/cancelled" ]
+  #   uri = "/webhooks/orders/cancelled"
+  #
+  #   [[webhooks.subscriptions]]
+  #   topics = [ "fulfillments/create" ]
+  #   uri = "/webhooks/fulfillments/create"
+  # ──────────────────────────────────────────────────────────────────────────
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "/webhooks/compliance"
+
+[pos]
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = true

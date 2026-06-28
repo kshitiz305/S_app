@@ -1,0 +1,58 @@
+# StockSentry — Shopify app configuration
+# NOTE: Run `shopify app config link` after creating the app in the Partner
+# Dashboard. That command fills in `client_id` and links this file to your app.
+# The placeholder below lets the file parse locally before linking.
+
+client_id = "REPLACE_WITH_CLIENT_ID_AFTER_config_link"
+name = "StockSentry"
+handle = "stocksentry"
+application_url = "https://localhost"
+embedded = true
+
+[access_scopes]
+# Scopes per DEVELOPMENT_SPEC §7 Phase 0.2 (+ read_locations for inventory writes)
+scopes = "read_products,write_products,read_inventory,write_inventory,read_orders,read_merchant_managed_fulfillment_orders,read_locations"
+
+[auth]
+redirect_urls = [
+  "https://localhost/auth/callback",
+  "https://localhost/auth/shopify/callback",
+  "https://localhost/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2026-04"
+
+  # Inventory-impacting events (Phase 3)
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create" ]
+  uri = "/webhooks/orders/create"
+
+  [[webhooks.subscriptions]]
+  topics = [ "refunds/create" ]
+  uri = "/webhooks/refunds/create"
+
+  [[webhooks.subscriptions]]
+  topics = [ "orders/cancelled" ]
+  uri = "/webhooks/orders/cancelled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "fulfillments/create" ]
+  uri = "/webhooks/fulfillments/create"
+
+  # Lifecycle (Phase 8)
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  # Mandatory GDPR / compliance webhooks (Phase 8)
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "/webhooks/compliance"
+
+[pos]
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true

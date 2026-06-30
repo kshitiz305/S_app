@@ -113,7 +113,7 @@ async function decorateBom(bom: BomWithComponents) {
       qtyPerFinished: dec(c.qtyPerFinished),
       costPerUnit: c.costPerUnit != null ? dec(c.costPerUnit) : null,
     })),
-    finishedAvailable: bomAvailable(finite),
+    finishedAvailable: finite.length === 0 ? null : bomAvailable(finite),
     constrainedBy,
     cogs: bomCogs(configs),
     margin: margin.margin,

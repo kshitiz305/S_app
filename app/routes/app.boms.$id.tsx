@@ -282,8 +282,18 @@ export default function BomEditor() {
                 <BlockStack gap="200">
                   <InlineStack align="space-between">
                     <Text as="span">Buildable now</Text>
-                    <Badge tone={bom.finishedAvailable <= 0 ? "critical" : "success"}>
-                      {String(bom.finishedAvailable)}
+                    <Badge
+                      tone={
+                        bom.finishedAvailable === null
+                          ? undefined
+                          : bom.finishedAvailable <= 0
+                            ? "critical"
+                            : "success"
+                      }
+                    >
+                      {bom.finishedAvailable === null
+                        ? "—"
+                        : String(bom.finishedAvailable)}
                     </Badge>
                   </InlineStack>
                   {bom.constrainedBy.length > 0 ? (

@@ -24,17 +24,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const settings = await getShopSettings(session.shop);
   const usage = await getUsageStatus(session.shop, settings.plan);
 
-  let activePlans: string[] = [];
+  let activePlans: string[] | null = null;
   try {
     const result = await billing.check({ plans: PAID, isTest });
     activePlans = result.appSubscriptions?.map((s) => s.name) ?? [];
   } catch {
-    activePlans = [];
+    // Couldn't reach Shopify Billing — leave the stored plan untouched rather
+    // than misread a transient error as "no subscription" and downgrade a
+    // paying merchant to Free.
+    activePlans = null;
   }
 
-  // Keep our stored plan honest with Shopify's source of truth.
-  const effectivePlan = activePlans[0] ?? "Free";
-  if (effectivePlan !== settings.plan) {
+  // Keep our stored plan honest with Shopify's source of truth, but only when we
+  // actually determined it. On a billing-check failure, trust the stored plan.
+  const effectivePlan = activePlans ? (activePlans[0] ?? "Free") : settings.plan;
+  if (activePlans && effectivePlan !== settings.plan) {
     await updateShopSettings(session.shop, { plan: effectivePlan });
   }
 

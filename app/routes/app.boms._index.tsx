@@ -24,8 +24,17 @@ export default function BomsList() {
   const rows = boms.map((b) => [
     b.name,
     String(b.components.length),
-    <Badge key={b.id} tone={b.finishedAvailable <= 0 ? "critical" : "success"}>
-      {String(b.finishedAvailable)}
+    <Badge
+      key={b.id}
+      tone={
+        b.finishedAvailable === null
+          ? undefined
+          : b.finishedAvailable <= 0
+            ? "critical"
+            : "success"
+      }
+    >
+      {b.finishedAvailable === null ? "—" : String(b.finishedAvailable)}
     </Badge>,
     b.salePrice ? `$${b.salePrice.toFixed(2)}` : "—",
     `$${b.cogs.toFixed(2)}`,

@@ -15,7 +15,7 @@
     "config:use": "shopify app config use",
     "env": "shopify app env",
     "start": "remix-serve ./build/server/index.js",
-    "docker-start": "npm run setup && npm run start",
+    "docker-start": "prisma migrate deploy && npm run start",
     "setup": "prisma generate && prisma migrate deploy",
     "prisma": "prisma",
     "graphql-codegen": "graphql-codegen",

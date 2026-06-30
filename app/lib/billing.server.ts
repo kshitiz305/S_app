@@ -7,6 +7,7 @@
 
 import prisma from "../db.server";
 import { PLANS } from "../shopify.server";
+import type { AdminGraphql } from "./sync.server";
 
 export type PlanName = "Free" | (typeof PLANS)[keyof typeof PLANS];
 
@@ -108,4 +109,37 @@ export async function canCreatePool(shopId: string, planName: string): Promise<b
   if (plan.maxPools === null) return true;
   const count = await prisma.pool.count({ where: { shopId } });
   return count < plan.maxPools;
+}
+
+const SHOP_BILLING_PLAN = /* GraphQL */ `
+  query ShopBillingPlan {
+    shop {
+      plan {
+        partnerDevelopment
+      }
+    }
+  }
+`;
+
+/**
+ * Whether app charges should be created as TEST charges.
+ *
+ * Shopify only allows test charges on development stores — a real (non-test)
+ * charge there fails with a BillingError that surfaces as a generic app error.
+ * So: always test outside production, and in production charge for real ONLY on
+ * non-development stores. This replaces guessing purely from NODE_ENV, which
+ * made the production deployment attempt real charges against a dev store and
+ * error out when switching plans.
+ */
+export async function useTestBilling(admin: AdminGraphql): Promise<boolean> {
+  if (process.env.NODE_ENV !== "production") return true;
+  try {
+    const res = await admin.graphql(SHOP_BILLING_PLAN);
+    const body = (await res.json()) as {
+      data?: { shop?: { plan?: { partnerDevelopment?: boolean } } };
+    };
+    return body.data?.shop?.plan?.partnerDevelopment ?? false;
+  } catch {
+    return false;
+  }
 }

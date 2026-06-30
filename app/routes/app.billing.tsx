@@ -13,16 +13,16 @@ import {
   Text,
 } from "@shopify/polaris";
 import { authenticate, PLANS } from "../shopify.server";
-import { PLAN_DEFS, getUsageStatus } from "../lib/billing.server";
+import { PLAN_DEFS, getUsageStatus, useTestBilling } from "../lib/billing.server";
 import { getShopSettings, updateShopSettings } from "../lib/shop.server";
 
 const PAID = [PLANS.STARTER, PLANS.GROWTH, PLANS.PRO];
-const isTest = process.env.NODE_ENV !== "production";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session, billing } = await authenticate.admin(request);
+  const { session, admin, billing } = await authenticate.admin(request);
   const settings = await getShopSettings(session.shop);
   const usage = await getUsageStatus(session.shop, settings.plan);
+  const isTest = await useTestBilling(admin);
 
   let activePlans: string[] | null = null;
   try {
@@ -46,9 +46,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session, billing } = await authenticate.admin(request);
+  const { session, admin, billing } = await authenticate.admin(request);
   const form = await request.formData();
   const intent = String(form.get("intent"));
+  const isTest = await useTestBilling(admin);
 
   if (intent === "cancel") {
     const result = await billing.check({ plans: PAID, isTest });

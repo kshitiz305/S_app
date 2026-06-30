@@ -7,7 +7,7 @@
  */
 
 import prisma from "../db.server";
-import { computeAvailable, lineConsumption } from "../domain/poolMath";
+import { clampNonNegative, lineConsumption } from "../domain/poolMath";
 import { dec, poolAvailable } from "./ledger.server";
 
 export interface SelfTestResult {
@@ -47,11 +47,7 @@ export async function runSelfTest(shopId: string, poolId: string): Promise<SelfT
   const consumesPerUnit = firstMember ? dec(firstMember.consumesPerUnit) : 0;
 
   const afterOneUnit = firstMember
-    ? computeAvailable({
-        totalOnHand: dec(pool.totalOnHand),
-        netLedgerDelta: -lineConsumption(1, consumesPerUnit),
-        buffer: dec(pool.buffer),
-      })
+    ? clampNonNegative(available - lineConsumption(1, consumesPerUnit))
     : available;
 
   // Smallest whole quantity whose demand exceeds availability.

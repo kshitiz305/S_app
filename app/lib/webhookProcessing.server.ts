@@ -123,10 +123,18 @@ export function orderLinesFromPayload(payload: {
 }
 
 export function refundLinesFromPayload(payload: {
-  refund_line_items?: Array<{ quantity?: number; line_item?: WebhookLineItem }>;
+  refund_line_items?: Array<{
+    quantity?: number;
+    restock_type?: string;
+    line_item?: WebhookLineItem;
+  }>;
 }): OrderLine[] {
   const lines: OrderLine[] = [];
   for (const rli of payload.refund_line_items ?? []) {
+    // Only restock the pool when Shopify itself restocks the item. A
+    // `no_restock` refund (e.g. damaged/non-returnable goods) must not inflate
+    // shared stock, or the pool oversells.
+    if (rli.restock_type === "no_restock") continue;
     const gid = variantGid(rli.line_item?.variant_id);
     if (!gid || !rli.quantity) continue;
     lines.push({ variantId: gid, quantity: rli.quantity });

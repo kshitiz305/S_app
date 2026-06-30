@@ -214,11 +214,13 @@ export async function syncPoolToShopify(
     const locationId = await getPrimaryLocationId(admin);
     if (locationId) {
       for (const m of trackable) {
+        const rate = dec(m.consumesPerUnit);
+        const sellable = rate > 0 ? Math.floor(available / rate) : available;
         try {
           await setVariantAvailable(admin, {
             inventoryItemId: m.inventoryItemId as string,
             locationId,
-            quantity: available,
+            quantity: sellable,
           });
         } catch (error) {
           logger.warn("Failed to mirror variant inventory", {

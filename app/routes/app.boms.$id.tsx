@@ -286,6 +286,11 @@ export default function BomEditor() {
                       {String(bom.finishedAvailable)}
                     </Badge>
                   </InlineStack>
+                  {bom.constrainedBy.length > 0 ? (
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Runs out first: {bom.constrainedBy.join(", ")}
+                    </Text>
+                  ) : null}
                   <InlineStack align="space-between">
                     <Text as="span">COGS</Text>
                     <Text as="span">${bom.cogs.toFixed(2)}</Text>

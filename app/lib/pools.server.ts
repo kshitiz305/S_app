@@ -7,7 +7,8 @@
 
 import type { Prisma } from "@prisma/client";
 import prisma from "../db.server";
-import { dec, poolAvailable } from "./ledger.server";
+import { roundUnits } from "../domain/poolMath";
+import { dec, poolAvailable, poolNetDelta, recordLedger } from "./ledger.server";
 import { getShopSettings } from "./shop.server";
 import {
   getPrimaryLocationId,
@@ -232,3 +233,71 @@ export async function syncPoolToShopify(
 
   return { available, metafieldWritten };
 }
+
+/**
+ * Respect (or override) a merchant's manual inventory edit made directly in
+ * Shopify (DEVELOPMENT_SPEC §4.3 + §7 Phase 3.5). Driven by the
+ * `inventory_levels/update` webhook.
+ *
+ * Loop-safety: we mirror availability into native inventory ourselves, which
+ * also fires this webhook. When the observed value already equals what we last
+ * pushed, it's our own echo and we do nothing — so there is no tug-of-war.
+ *
+ *  - respectManual: treat the merchant's value as the new pool availability by
+ *    adjusting totalOnHand (capacity), log a `manual` ledger entry, re-sync.
+ *  - authoritative: re-push the app's computed value, overwriting the edit.
+ */
+export async function applyManualInventoryEdit(
+  admin: AdminGraphql,
+  shopId: string,
+  inventoryItemId: string,
+  observed: number,
+  sourceId: string,
+): Promise<{ handled: boolean; mode?: string; available?: number }> {
+  const member = await prisma.poolMember.findFirst({
+    where: { inventoryItemId, pool: { shopId } },
+    include: { pool: true },
+  });
+  if (!member) return { handled: false };
+
+  const pool = member.pool;
+  const current = await poolAvailable(pool);
+  const lastPushed = Math.max(0, Math.trunc(current));
+
+  // Our own write echoing back → ignore (prevents the loop the incumbent has).
+  if (observed === lastPushed) return { handled: false };
+
+  if (pool.reconcileMode === "authoritative") {
+    await syncPoolToShopify(admin, shopId, pool.id);
+    logger.info("manual edit overridden (authoritative)", {
+      poolId: pool.id,
+      observed,
+      restoredTo: lastPushed,
+    });
+    return { handled: true, mode: "authoritative", available: current };
+  }
+
+  // respectManual: make availability equal the merchant's value via totalOnHand.
+  const netDelta = await poolNetDelta(pool.id);
+  const newTotalOnHand = roundUnits(observed - netDelta + dec(pool.buffer));
+  await prisma.pool.update({
+    where: { id: pool.id },
+    data: { totalOnHand: newTotalOnHand },
+  });
+  await recordLedger({
+    shopId,
+    poolId: pool.id,
+    delta: 0,
+    reason: "manual",
+    sourceId: `manual:${sourceId}`,
+    note: `Manual edit on ${inventoryItemId}: availability set to ${observed}`,
+  });
+  const result = await syncPoolToShopify(admin, shopId, pool.id);
+  logger.info("manual edit respected", {
+    poolId: pool.id,
+    observed,
+    newTotalOnHand,
+  });
+  return { handled: true, mode: "respectManual", available: result.available };
+}
+

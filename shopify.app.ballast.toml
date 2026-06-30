@@ -47,6 +47,12 @@ api_version = "2026-04"
   #   uri = "/webhooks/fulfillments/create"
   # ──────────────────────────────────────────────────────────────────────────
 
+  # Manual-edit detection — inventory data, NOT protected customer data, so this
+  # is safe to subscribe immediately. Drives each pool's reconcileMode policy.
+  [[webhooks.subscriptions]]
+  topics = [ "inventory_levels/update" ]
+  uri = "/webhooks/inventory_levels/update"
+
   [[webhooks.subscriptions]]
   topics = [ "app/uninstalled" ]
   uri = "/webhooks/app/uninstalled"

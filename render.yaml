@@ -30,9 +30,11 @@ services:
         value: f0a72a979bef4b87678eb17a96847bcd
       - key: SCOPES
         value: read_products,write_products,read_inventory,write_inventory,read_orders,read_merchant_managed_fulfillment_orders,read_locations
-      # --- set these in the Render dashboard (encrypted) ---
+      # Public app URL (not a secret) — hardcoded so the embedded app + App Bridge
+      # always point at this Render service. Must match the app's application_url.
       - key: SHOPIFY_APP_URL
-        sync: false
+        value: https://stocksentry-v16f.onrender.com
+      # --- set these in the Render dashboard (encrypted) ---
       - key: SHOPIFY_API_SECRET
         sync: false
       - key: DATABASE_URL

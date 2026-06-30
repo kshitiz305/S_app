@@ -1,11 +1,11 @@
-# StockSentry — Shopify app configuration
-# NOTE: Run `shopify app config link` after creating the app in the Partner
-# Dashboard. That command fills in `client_id` and links this file to your app.
-# The placeholder below lets the file parse locally before linking.
+# BALLAST — LOCAL DEV config (same app as shopify.app.ballast.toml).
+# Use this for local development: `shopify app dev` updates the URLs below to your
+# tunnel automatically (automatically_update_urls_on_dev = true). For a custom
+# Cloudflare tunnel: `shopify app dev --config shopify.app.toml --tunnel-url=https://<host>:3000`.
+# Switch to production (Render) with: `shopify app config use ballast`.
 
-client_id = "REPLACE_WITH_CLIENT_ID_AFTER_config_link"
-name = "StockSentry"
-handle = "stocksentry"
+client_id = "f0a72a979bef4b87678eb17a96847bcd"
+name = "BALLAST"
 application_url = "https://localhost"
 embedded = true
 
@@ -23,22 +23,29 @@ redirect_urls = [
 [webhooks]
 api_version = "2026-04"
 
-  # Inventory-impacting events (Phase 3)
-  [[webhooks.subscriptions]]
-  topics = [ "orders/create" ]
-  uri = "/webhooks/orders/create"
+  # Inventory-impacting events (Phase 3) — PROTECTED customer data. Keep these
+  # COMMENTED until "Protected customer data access" is approved for the app,
+  # otherwise `shopify app dev`/`deploy` fails to register them.
+  #   [[webhooks.subscriptions]]
+  #   topics = [ "orders/create" ]
+  #   uri = "/webhooks/orders/create"
+  #
+  #   [[webhooks.subscriptions]]
+  #   topics = [ "refunds/create" ]
+  #   uri = "/webhooks/refunds/create"
+  #
+  #   [[webhooks.subscriptions]]
+  #   topics = [ "orders/cancelled" ]
+  #   uri = "/webhooks/orders/cancelled"
+  #
+  #   [[webhooks.subscriptions]]
+  #   topics = [ "fulfillments/create" ]
+  #   uri = "/webhooks/fulfillments/create"
 
+  # Manual-edit detection (respect merchant edits) — not protected customer data.
   [[webhooks.subscriptions]]
-  topics = [ "refunds/create" ]
-  uri = "/webhooks/refunds/create"
-
-  [[webhooks.subscriptions]]
-  topics = [ "orders/cancelled" ]
-  uri = "/webhooks/orders/cancelled"
-
-  [[webhooks.subscriptions]]
-  topics = [ "fulfillments/create" ]
-  uri = "/webhooks/fulfillments/create"
+  topics = [ "inventory_levels/update" ]
+  uri = "/webhooks/inventory_levels/update"
 
   # Lifecycle (Phase 8)
   [[webhooks.subscriptions]]

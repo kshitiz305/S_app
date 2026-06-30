@@ -16,9 +16,12 @@ import prisma from "../db.server";
 import { captureException, logger } from "./logger.server";
 import { recordLedger } from "./ledger.server";
 import { resolvePoolConsumption, type OrderLine } from "./consumption.server";
-import { syncPoolToShopify } from "./pools.server";
+import { applyManualInventoryEdit, syncPoolToShopify } from "./pools.server";
 import type { AdminGraphql } from "./sync.server";
 import type { LedgerReason } from "../domain/types";
+
+/** After this many delivery attempts a failing event is parked as a dead-letter. */
+const DEAD_LETTER_AFTER_ATTEMPTS = 5;
 
 interface ProcessArgs {
   shopId: string;
@@ -56,7 +59,7 @@ export async function processWebhook({ shopId, topic, eventId, run }: ProcessArg
   } catch (error) {
     captureException(error, { topic, eventId, shopId });
     if (eventId) {
-      await prisma.webhookEvent.upsert({
+      const record = await prisma.webhookEvent.upsert({
         where: { shopifyEventId: eventId },
         create: {
           shopId,
@@ -71,6 +74,14 @@ export async function processWebhook({ shopId, topic, eventId, run }: ProcessArg
           error: String(error),
         },
       });
+      // Park chronically failing events as dead-letters for manual inspection.
+      if (record.attempts >= DEAD_LETTER_AFTER_ATTEMPTS && record.status !== "deadletter") {
+        await prisma.webhookEvent.update({
+          where: { shopifyEventId: eventId },
+          data: { status: "deadletter" },
+        });
+        logger.error("webhook dead-lettered", { topic, eventId, attempts: record.attempts });
+      }
     }
     throw error; // surface a 500 so Shopify retries (dead-letters after its budget)
   }
@@ -83,6 +94,15 @@ export function variantGid(id: unknown): string | null {
   if (s.startsWith("gid://")) return s;
   if (!/^\d+$/.test(s)) return null;
   return `gid://shopify/ProductVariant/${s}`;
+}
+
+/** Numeric REST inventory item id → Admin GraphQL GID. */
+export function inventoryItemGid(id: unknown): string | null {
+  if (id === null || id === undefined) return null;
+  const s = String(id);
+  if (s.startsWith("gid://")) return s;
+  if (!/^\d+$/.test(s)) return null;
+  return `gid://shopify/InventoryItem/${s}`;
 }
 
 interface WebhookLineItem {
@@ -243,6 +263,35 @@ export async function handleFulfillmentsCreate(
     eventId,
     run: async () => {
       logger.info("fulfillment observed", { shopId, fulfillmentId: payload.id });
+    },
+  });
+}
+
+/**
+ * Manual inventory edit handler (DEVELOPMENT_SPEC §4.3 / §7 Phase 3.5).
+ * Honors each pool's `reconcileMode` so the app never fights a merchant's
+ * manual stock edit (respectManual) — or always wins (authoritative).
+ */
+export async function handleInventoryLevelsUpdate(
+  admin: AdminGraphql,
+  shopId: string,
+  payload: { inventory_item_id?: number | string; available?: number },
+  eventId?: string | null,
+): Promise<void> {
+  await processWebhook({
+    shopId,
+    topic: "inventory_levels/update",
+    eventId,
+    run: async () => {
+      const inventoryItemId = inventoryItemGid(payload.inventory_item_id);
+      if (!inventoryItemId || typeof payload.available !== "number") return;
+      await applyManualInventoryEdit(
+        admin,
+        shopId,
+        inventoryItemId,
+        payload.available,
+        eventId ?? `${inventoryItemId}:${Date.now()}`,
+      );
     },
   });
 }

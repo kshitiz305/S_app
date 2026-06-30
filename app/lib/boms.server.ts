@@ -6,7 +6,7 @@
  */
 
 import prisma from "../db.server";
-import { bomAvailable, bomCogs, bomMargin } from "../domain/bom";
+import { bindingComponents, bomAvailable, bomCogs, bomMargin } from "../domain/bom";
 import type { BomComponentConfig } from "../domain/types";
 import { dec, poolAvailable } from "./ledger.server";
 
@@ -91,6 +91,14 @@ async function decorateBom(bom: BomWithComponents) {
   const salePrice = bom.salePrice != null ? dec(bom.salePrice) : 0;
   const margin = bomMargin(configs, salePrice);
 
+  // Identify the component(s) that run out first (the binding constraint, §1).
+  const finite = configs.filter((c) => Number.isFinite(c.available));
+  const labelByRef = new Map<string, string>();
+  for (const c of bom.components) {
+    labelByRef.set(c.poolId ?? c.variantId ?? "", c.pool?.name ?? c.variantId ?? "component");
+  }
+  const constrainedBy = bindingComponents(finite).map((b) => labelByRef.get(b.ref) ?? b.ref);
+
   return {
     id: bom.id,
     name: bom.name,
@@ -105,7 +113,8 @@ async function decorateBom(bom: BomWithComponents) {
       qtyPerFinished: dec(c.qtyPerFinished),
       costPerUnit: c.costPerUnit != null ? dec(c.costPerUnit) : null,
     })),
-    finishedAvailable: bomAvailable(configs.filter((c) => Number.isFinite(c.available))),
+    finishedAvailable: bomAvailable(finite),
+    constrainedBy,
     cogs: bomCogs(configs),
     margin: margin.margin,
     marginPct: margin.marginPct,

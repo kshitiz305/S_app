@@ -22,6 +22,24 @@ export interface DevFallbackBilling {
   request(options: BillingRequestOptions): Promise<unknown>;
 }
 
+/** Surface Shopify's `userErrors` (BillingError.errorData) — otherwise the cause
+ * is invisible and the click just yields a generic 500 / "Application error". */
+function logBillingFailure(error: unknown, options: BillingRequestOptions): void {
+  const errorData =
+    error && typeof error === "object" && "errorData" in error
+      ? (error as { errorData?: unknown }).errorData
+      : undefined;
+  console.error(
+    "[billing] request failed " +
+      JSON.stringify({
+        plan: options.plan,
+        isTest: options.isTest,
+        message: error instanceof Error ? error.message : String(error),
+        errorData,
+      }),
+  );
+}
+
 export async function requestBillingWithDevFallback(
   billing: DevFallbackBilling,
   options: BillingRequestOptions,
@@ -35,9 +53,17 @@ export async function requestBillingWithDevFallback(
     // charge and it failed, retry once as a test charge so dev / staging stores can
     // finish subscribing instead of surfacing a generic 500.
     if (!options.isTest) {
-      await billing.request({ ...options, isTest: true });
+      const testOptions = { ...options, isTest: true };
+      try {
+        await billing.request(testOptions);
+      } catch (retryError) {
+        if (retryError instanceof Response) throw retryError;
+        logBillingFailure(retryError, testOptions);
+        throw retryError;
+      }
       throw new Error("Billing request did not redirect after test-charge retry.");
     }
+    logBillingFailure(error, options);
     throw error;
   }
   // billing.request always throws (redirect Response on success, error on failure);

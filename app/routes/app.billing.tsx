@@ -14,6 +14,7 @@ import {
 } from "@shopify/polaris";
 import { authenticate, PLANS } from "../shopify.server";
 import { PLAN_DEFS, getUsageStatus, useTestBilling } from "../lib/billing.server";
+import { requestBillingWithDevFallback } from "../lib/billingRequest.server";
 import { getShopSettings, updateShopSettings } from "../lib/shop.server";
 
 const PAID = [PLANS.STARTER, PLANS.GROWTH, PLANS.PRO];
@@ -62,7 +63,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (intent === "subscribe") {
     const plan = String(form.get("plan"));
-    return billing.request({
+    return requestBillingWithDevFallback(billing, {
       plan,
       isTest,
       returnUrl: `${process.env.SHOPIFY_APP_URL}/app/billing`,
